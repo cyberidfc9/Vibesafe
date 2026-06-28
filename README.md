@@ -77,7 +77,7 @@ VibeSafe bridges this gap by acting as an automated security engineer on your ma
 - Python **3.10** or newer installed.
 - Pip (Python Package Installer).
 
-### Step-by-Step Installation
+### Step-by-Step Installation (Linux / Kali Linux / macOS)
 
 1. **Clone the repository**:
    ```bash
@@ -85,17 +85,25 @@ VibeSafe bridges this gap by acting as an automated security engineer on your ma
    cd Vibesafe
    ```
 
-2. **Install in editable mode**:
-   This installs the tool and registers the global `vibesafe` command on your system:
+2. **Run the Hollywood-style interactive installer**:
+   This automatically bypasses the PEP 668 `externally-managed-environment` error by sandboxing the tool in a Python virtual environment and mapping the global command interface:
    ```bash
-   pip install -e .
+   chmod +x setup.sh
+   ./setup.sh
    ```
 
 3. **Verify installation**:
-   Run the version or phases command to ensure the CLI is loaded:
+   Run the phases command to ensure the global execution wrapper is active:
    ```bash
    vibesafe phases
    ```
+
+### Alternate Manual Installation (Windows)
+
+If you are on Windows, run:
+```bash
+pip install -e .
+```
 
 ---
 
