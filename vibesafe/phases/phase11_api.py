@@ -39,28 +39,40 @@ def run(config, scan_result=None) -> PhaseResult:
         if not content:
             continue
 
-        # Check for missing authentication checks in Next.js / Express routes
-        # NextAuth session verification indicators: getServerSession, getSession, auth(), getToken
-        # Clerk session indicators: auth()
-        # Express session indicators: req.user, isAuthenticated
-        auth_keywords = ["getServerSession", "getSession", "auth()", "getToken", "req.user", "isAuthenticated", "get_object_or_404", "require_auth", "login_required", "@router."]
+        # Framework-aware authentication checking keywords
+        # Next.js, Express, Django, FastAPI
+        stack = None
+        if scan_result and scan_result.tech_stack:
+            stack = scan_result.tech_stack
+
+        auth_keywords = ["getServerSession", "getSession", "auth()", "getToken", "req.user", "isAuthenticated", "get_object_or_404", "require_auth", "login_required", "@router.", "Depends("]
         
+        # Refine check list based on framework
+        if stack and stack.framework:
+            if "Next.js" in stack.framework:
+                auth_keywords = ["getServerSession", "auth(", "getToken", "next-auth", "clerkClient", "getAuth"]
+            elif "Express" in stack.framework:
+                auth_keywords = ["req.user", "isAuthenticated", "passport.authenticate", "verifyToken", "jwt.verify"]
+            elif "Django" in stack.framework:
+                auth_keywords = ["login_required", "PermissionRequiredMixin", "permissions.IsAuthenticated", "APIView"]
+            elif "FastAPI" in stack.framework:
+                auth_keywords = ["Depends(", "security", "OAuth2", "get_current_user", "get_active_user"]
+
         has_auth_check = any(kw in content for kw in auth_keywords)
         
-        # If route handles POST/PUT/DELETE/PATCH but has no obvious auth check
-        is_mutating = "POST" in content or "PUT" in content or "DELETE" in content or "PATCH" in content or "async function GET" in content
+        # If route handles mutations (POST/PUT/DELETE) but has no obvious auth check
+        is_mutating = "POST" in content or "PUT" in content or "DELETE" in content or "PATCH" in content or "async function GET" in content or "def post(" in content
         
         if is_mutating and not has_auth_check:
-            # We flag this as a potential unprotected route
             finding = Finding(
                 title="Potential Unprotected API Route",
                 severity=Severity.HIGH,
                 phase=11,
                 phase_name="API Security",
-                description=f"API route file `{route_file.name}` contains mutating HTTP methods or query logic, but no authentication checks or session guards were detected.",
+                description=f"API route file `{route_file.name}` contains mutating HTTP methods or database write calls, but no authentication checks or permission dependencies ({', '.join(auth_keywords[:4])}) were detected.",
                 file_path=str(route_file.name),
                 evidence=content[:200].replace("\n", " "),
-                remediation="Ensure session validation is executed at the entry point of the route handler. Reject requests with 401/403 status code if session is invalid.",
+                remediation="Configure a middleware filter or verify session variables at the start of your request handler context.",
                 owasp_category=OWASPCategory.A01_BROKEN_ACCESS_CONTROL
             )
             findings.append(finding)

@@ -13,13 +13,22 @@ def run(config, scan_result=None) -> PhaseResult:
     start_time = time.time()
     findings = []
     
-    # We scan source files for indicators of raw req.body / req.query usage
-    # without typical validation libraries (zod, yup, joi, class-validator)
-    source_files = list(walk_source_files(config))
+    # We check if tech stack context exists
+    stack = None
+    if scan_result and scan_result.tech_stack:
+        stack = scan_result.tech_stack
 
-    # Regexes for form/query parameters being assigned directly
-    validation_libs = ["zod", "yup", "joi", "express-validator", "pydantic", "marshmallow", "validator"]
-    
+    # Stack-aware validation libraries
+    if stack and stack.runtime == "Python":
+        validation_libs = ["pydantic", "marshmallow", "wtforms", "serializer", "Form"]
+        expected_handler_patterns = ["request.GET", "request.POST", "request.data", "request.json", "request.args", "request.form"]
+        remediation_text = "Use Pydantic models (for FastAPI/Flask) or Django Forms/Serializers to validate and sanitize client input data."
+    else:
+        # Default to Node.js/JS libs
+        validation_libs = ["zod", "yup", "joi", "express-validator", "validator", "superstruct"]
+        expected_handler_patterns = ["req.body", "req.query", "req.params", "request.json()", "searchParams.get"]
+        remediation_text = "Use a schema validation library like Zod, Yup, or Joi to parse and sanitize all request parameters."
+
     for filepath in source_files:
         if "vibesafe" in filepath.parts:
             continue
@@ -29,7 +38,7 @@ def run(config, scan_result=None) -> PhaseResult:
             continue
 
         # Let's check if this file contains an API route or page handler
-        is_handler = "req.body" in content or "req.query" in content or "request.GET" in content or "request.POST" in content or "request.json()" in content or "searchParams" in content
+        is_handler = any(pattern in content for pattern in expected_handler_patterns)
         
         if is_handler:
             # Check if any validation libraries are imported
@@ -37,14 +46,14 @@ def run(config, scan_result=None) -> PhaseResult:
             
             if not has_validation:
                 finding = Finding(
-                    title="Missing Schema Input Validation",
+                    title="Missing Input Validation Schema",
                     severity=Severity.MEDIUM,
                     phase=9,
                     phase_name="Input Validation",
-                    description=f"File `{filepath.name}` handles client requests but does not import or use a schema validation library (Zod, Yup, Joi, or Pydantic).",
+                    description=f"File `{filepath.name}` handles client requests but does not import or use any expected validation library ({', '.join(validation_libs)}).",
                     file_path=str(filepath.name),
                     evidence="No validation imports found in request handler file.",
-                    remediation="Use a schema validator like Zod (for JS/TS) or Pydantic (for Python) to parse and sanitize all input (req.body, req.query, params) before executing database or file actions.",
+                    remediation=remediation_text,
                     owasp_category=OWASPCategory.A03_INJECTION
                 )
                 findings.append(finding)
