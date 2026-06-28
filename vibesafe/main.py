@@ -50,13 +50,11 @@ def scan(
         None,
         "--phase", "-p",
         help="Run only a specific phase (1-20)",
-        min=1,
-        max=20,
     ),
-    skip: Optional[list[int]] = typer.Option(
+    skip: Optional[str] = typer.Option(
         None,
         "--skip", "-s",
-        help="Skip specific phases (can be repeated: --skip 17 --skip 15)",
+        help="Comma-separated list of phases to skip (e.g. --skip 17,18)",
     ),
     skip_guided: bool = typer.Option(
         False,
@@ -98,7 +96,7 @@ def scan(
 
     # Apply CLI overrides
     if skip:
-        config.skip_phases = list(skip)
+        config.skip_phases = [int(p.strip()) for p in skip.split(",") if p.strip().isdigit()]
     if skip_guided:
         config.skip_guided = True
     if output:
