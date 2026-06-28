@@ -1,0 +1,1 @@
+"""VibeSafe security pattern libraries."""
