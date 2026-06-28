@@ -63,6 +63,8 @@ def run(config, scan_result=None) -> PhaseResult:
         passed = None
         if should_prompt:
             passed = ask_checklist(desc)
+            if passed == "quit":
+                break
         
         checklist.append(ChecklistItem(description=desc, passed=passed))
         

@@ -193,23 +193,36 @@ def print_checklist_item(description: str, passed: Optional[bool] = None):
 
 
 def ask_checklist(description: str) -> Optional[bool]:
-    """Ask user to verify a checklist item. Returns True/False/None (skip)."""
+    """Ask user to verify a checklist item. Loops until a valid input is received."""
     console.print(f"\n  ⬜ [bold]{description}[/bold]")
-    console.print("    [dim](y=pass, n=fail, s=skip, q=skip remaining)[/dim]", end=" ")
+    
+    while True:
+        console.print("    [dim](y=pass, n=fail, s=skip, q=skip remaining)[/dim]", end=" ")
+        try:
+            response = input().strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            console.print()
+            return None
 
-    try:
-        response = input().strip().lower()
-    except (EOFError, KeyboardInterrupt):
-        return None
-
-    if response in ("y", "yes", "pass", "p"):
-        console.print(f"  ✅ [green]{description}[/green]")
-        return True
-    elif response in ("n", "no", "fail", "f"):
-        console.print(f"  ❌ [red]{description}[/red]")
-        return False
-    else:
-        return None
+        if response in ("y", "yes", "pass", "p"):
+            console.print(f"  ✅ [green]{description}[/green]")
+            return True
+        elif response in ("n", "no", "fail", "f"):
+            console.print(f"  ❌ [red]{description}[/red]")
+            return False
+        elif response in ("s", "skip"):
+            console.print(f"  ⏭️  [dim]Skipped: {description}[/dim]")
+            return None
+        elif response in ("q", "quit", "exit"):
+            console.print("  ⏭️  [dim]Skipping remaining checks in this phase...[/dim]")
+            # We raise a custom KeyboardInterrupt or return a special status.
+            # To keep it simple, returning a special flag or None is enough,
+            # but we can return False/None. Let's return "QUIT" token or None.
+            # We can use "q" to skip the whole phase, let's return None and let the phase know.
+            # To support "q" (skip remaining), returning "quit" string is a good idea.
+            return "quit"
+        else:
+            console.print("    [red]⚠ Invalid input. Please type 'y' for pass, 'n' for fail, 's' to skip, or 'q' to quit phase checks.[/red]")
 
 
 # ─── Final Report Display ───────────────────────────────────────────────────────

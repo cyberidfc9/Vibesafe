@@ -22,6 +22,8 @@ def run(config, scan_result=None) -> PhaseResult:
         passed = None
         if not config.skip_guided:
             passed = ask_checklist(desc)
+            if passed == "quit":
+                break
         
         checklist.append(ChecklistItem(description=desc, passed=passed))
         
