@@ -143,8 +143,8 @@ DESERIALIZATION_PATTERNS: list[tuple[str, str, re.Pattern, str]] = [
     ),
     (
         "JSON Parse without Try/Catch",
-        "JSON.parse() without error handling can crash the app",
-        re.compile(r'(?<!\btry\b[^}]*)JSON\.parse\s*\('),
+        "JSON.parse() usage — ensure it is wrapped in try/catch to handle malformed input",
+        re.compile(r'JSON\.parse\s*\('),
         "Wrap JSON.parse() in try/catch to handle malformed input gracefully."
     ),
 ]
