@@ -1,12 +1,14 @@
 """
-Phase 20: Final Security Report
+Phase 20: Final Security Report & PDF Generation
 """
 
 import time
+import shutil
 from datetime import datetime
 from pathlib import Path
 from vibesafe.models import PhaseResult, PhaseType, Finding, Severity, OWASPCategory
 from vibesafe.ui import print_report_saved
+from vibesafe.cwe_database import get_cwe_name
 
 def run(config, scan_result=None) -> PhaseResult:
     start_time = time.time()
@@ -26,14 +28,30 @@ def run(config, scan_result=None) -> PhaseResult:
     out_dir.mkdir(parents=True, exist_ok=True)
     
     date_str = datetime.now().strftime("%Y-%m-%d")
-    
     saved_paths = []
     
-    # Aggregate all findings across phases
+    # Aggregate all findings across phases (uses cached triaged findings if run by engine)
     all_findings = scan_result.all_findings
-
-    # Count severities
     counts = scan_result.severity_counts
+
+    # Detect tool coverage
+    tool_coverage = {}
+    for tool in ["codeql", "semgrep", "gitleaks", "trivy", "nuclei"]:
+        enabled = config.enable_integrations.get(tool, True)
+        installed = shutil.which(tool) is not None
+        # Nuclei requires url
+        if tool == "nuclei" and not config.url:
+            status = "⏭️ Skipped (No URL)"
+        elif not enabled:
+            status = "❌ Disabled"
+        elif not installed:
+            status = "⚠️ Not Installed"
+        else:
+            status = "✅ Active"
+        tool_coverage[tool] = status
+
+    # Sort findings by risk score (highest first)
+    sorted_findings = sorted(all_findings, key=lambda f: f.risk_score, reverse=True)
 
     # 2. Generate Markdown Report
     if "markdown" in config.report_formats:
@@ -53,25 +71,27 @@ def run(config, scan_result=None) -> PhaseResult:
 | :--- | :---: | :--- |
 | **{scan_result.score}/100** | **{scan_result.grade} ({scan_result.grade_label})** | 🔴 Critical: {counts[Severity.CRITICAL]}<br>🟠 High: {counts[Severity.HIGH]}<br>🟡 Medium: {counts[Severity.MEDIUM]}<br>🔵 Low: {counts[Severity.LOW]}<br>⚪ Info: {counts[Severity.INFO]} |
 
----
-
-## Detailed Findings
-
+### 🛠️ External Tool Coverage
 """
-        if all_findings:
-            # Sort findings by severity (Critical first)
-            sev_order = list(Severity)
-            sorted_findings = sorted(all_findings, key=lambda f: sev_order.index(f.severity))
-            
+        for tool, status in tool_coverage.items():
+            md_content += f"- **{tool.upper()}:** {status}\n"
+
+        md_content += "\n---\n\n## Detailed Findings\n\n"
+        
+        if sorted_findings:
             for i, f in enumerate(sorted_findings, 1):
                 loc = f"{f.file_path or 'Global'}"
                 if f.line_number:
                     loc += f":L{f.line_number}"
                 
-                md_content += f"""### {i}. {f.severity.emoji} {f.severity.value.upper()} │ {f.title}
+                tool_label = f"[{f.source_tool.upper()}]" if f.source_tool else "[VIBESAFE]"
+                
+                md_content += f"""### {i}. {f.severity.emoji} {f.severity.value.upper()} │ {f.title} {tool_label}
 * **Phase:** Phase {f.phase} ({f.phase_name})
 * **Location:** `{loc}`
+* **CWE Mapping:** {get_cwe_name(f.cwe_id)}
 * **OWASP Mapping:** {f.owasp_category.value if f.owasp_category else 'N/A'}
+* **Exploitability score:** `{f.exploitability_score}/10` │ **Risk Score:** `{f.risk_score:.1f}`
 
 #### Description
 {f.description}
@@ -92,67 +112,77 @@ def run(config, scan_result=None) -> PhaseResult:
 
 """
         else:
-            md_content += "🎉 **No security issues found!** The application complies with all automated and checked security phases.\n"
+            md_content += "🎉 **No security issues found!** The application complies with all automated security checks.\n"
 
         md_file.write_text(md_content, encoding="utf-8")
         saved_paths.append(str(md_file.resolve()))
 
-    # 3. Generate HTML Report
-    if "html" in config.report_formats:
-        html_file = out_dir / f"vibesafe-report-{date_str}.html"
-        
-        # Build finding cards HTML
-        findings_html = ""
-        if all_findings:
-            sev_order = list(Severity)
-            sorted_findings = sorted(all_findings, key=lambda f: sev_order.index(f.severity))
+    # 3. Generate HTML & PDF Report content
+    # Build findings table and cards
+    findings_html = ""
+    if sorted_findings:
+        for i, f in enumerate(sorted_findings, 1):
+            loc = f"{f.file_path or 'Global'}"
+            if f.line_number:
+                loc += f":L{f.line_number}"
             
-            for i, f in enumerate(sorted_findings, 1):
-                loc = f"{f.file_path or 'Global'}"
-                if f.line_number:
-                    loc += f":L{f.line_number}"
-                
-                evidence_block = ""
-                if f.evidence:
-                    evidence_block = f"""
-                    <div class="evidence-block">
-                        <strong>Evidence:</strong>
-                        <pre><code>{f.evidence}</code></pre>
-                    </div>"""
-                
-                remediation_block = ""
-                if f.remediation:
-                    remediation_block = f"""
-                    <div class="remediation-block">
-                        <strong>💡 Remediation:</strong>
-                        <p>{f.remediation}</p>
-                    </div>"""
-
-                findings_html += f"""
-                <div class="finding-card" data-severity="{f.severity.value}">
-                    <div class="card-header border-{f.severity.color}">
-                        <span class="badge badge-{f.severity.color}">{f.severity.emoji} {f.severity.value.upper()}</span>
-                        <h3>{f.title}</h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="finding-meta">
-                            <span><strong>Phase:</strong> Phase {f.phase} ({f.phase_name})</span>
-                            <span><strong>Location:</strong> <code>{loc}</code></span>
-                            <span><strong>OWASP:</strong> {f.owasp_category.value if f.owasp_category else 'N/A'}</span>
-                        </div>
-                        <p class="description">{f.description}</p>
-                        {evidence_block}
-                        {remediation_block}
-                    </div>
+            evidence_block = ""
+            if f.evidence:
+                evidence_block = f"""
+                <div class="evidence-block">
+                    <strong>Evidence:</strong>
+                    <pre><code>{f.evidence}</code></pre>
                 </div>"""
-        else:
-            findings_html = """
-            <div class="no-findings">
-                🎉 No security issues found! Keep up the good work.
-            </div>"""
+            
+            remediation_block = ""
+            if f.remediation:
+                remediation_block = f"""
+                <div class="remediation-block">
+                    <strong>💡 Remediation:</strong>
+                    <p>{f.remediation}</p>
+                </div>"""
 
-        # HTML template with dark mode aesthetics
-        html_content = f"""<!DOCTYPE html>
+            tool_badge = f"""<span class="badge badge-tool">{f.source_tool or 'vibesafe'}</span>"""
+
+            findings_html += f"""
+            <div class="finding-card" data-severity="{f.severity.value}">
+                <div class="card-header border-{f.severity.color}">
+                    <span class="badge badge-{f.severity.color}">{f.severity.emoji} {f.severity.value.upper()}</span>
+                    {tool_badge}
+                    <h3>{f.title}</h3>
+                </div>
+                <div class="card-body">
+                    <div class="finding-meta">
+                        <span><strong>Phase:</strong> Phase {f.phase} ({f.phase_name})</span>
+                        <span><strong>Location:</strong> <code>{loc}</code></span>
+                        <span><strong>CWE:</strong> {get_cwe_name(f.cwe_id)}</span>
+                        <span><strong>OWASP:</strong> {f.owasp_category.value if f.owasp_category else 'N/A'}</span>
+                        <span><strong>Exploitability:</strong> <code>{f.exploitability_score}/10</code></span>
+                        <span><strong>Risk Score:</strong> <code>{f.risk_score:.1f}</code></span>
+                    </div>
+                    <p class="description">{f.description}</p>
+                    {evidence_block}
+                    {remediation_block}
+                </div>
+            </div>"""
+    else:
+        findings_html = """
+        <div class="no-findings">
+            🎉 No security issues found! Keep up the good work.
+        </div>"""
+
+    # Build coverage HTML
+    coverage_html = ""
+    for tool, status in tool_coverage.items():
+        status_class = "status-active" if "Active" in status else ("status-skipped" if "Skipped" in status else "status-error")
+        coverage_html += f"""
+        <div class="coverage-item">
+            <span class="coverage-tool">{tool.upper()}</span>
+            <span class="coverage-status {status_class}">{status}</span>
+        </div>"""
+
+    # HTML template with dark mode aesthetics
+    html_content = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -272,6 +302,45 @@ def run(config, scan_result=None) -> PhaseResult:
             font-weight: 600;
         }}
 
+        /* Tool Coverage section */
+        .coverage-section {{
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 40px;
+        }}
+
+        .coverage-grid {{
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 15px;
+            margin-top: 15px;
+        }}
+
+        .coverage-item {{
+            background: rgba(255, 255, 255, 0.02);
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+        }}
+
+        .coverage-tool {{
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }}
+
+        .coverage-status {{
+            font-size: 0.85rem;
+            font-weight: 600;
+        }}
+
+        .status-active {{ color: #56d364; }}
+        .status-skipped {{ color: #e3b341; }}
+        .status-error {{ color: #f85149; }}
+
         /* Findings Filters */
         .filter-bar {{
             margin-bottom: 30px;
@@ -384,6 +453,7 @@ def run(config, scan_result=None) -> PhaseResult:
         .badge-yellow {{ background-color: var(--medium-color); color: #0d1117; }}
         .badge-blue {{ background-color: var(--low-color); color: white; }}
         .badge-dim {{ background-color: var(--info-color); color: white; }}
+        .badge-tool {{ background-color: #30363d; color: var(--accent-cyan); }}
 
         .no-findings {{
             text-align: center;
@@ -452,6 +522,13 @@ def run(config, scan_result=None) -> PhaseResult:
             </div>
         </section>
 
+        <section class="coverage-section">
+            <h2>🛠️ External Tool Coverage</h2>
+            <div class="coverage-grid">
+                {coverage_html}
+            </div>
+        </section>
+
         <h2>Vulnerabilities Discovered</h2>
         <div class="filter-bar">
             <button class="filter-btn active" onclick="filterSeverity('all')">All</button>
@@ -468,8 +545,36 @@ def run(config, scan_result=None) -> PhaseResult:
 </body>
 </html>"""
 
+    if "html" in config.report_formats:
+        html_file = out_dir / f"vibesafe-report-{date_str}.html"
         html_file.write_text(html_content, encoding="utf-8")
         saved_paths.append(str(html_file.resolve()))
+
+    # 4. Generate PDF Report if requested
+    if "pdf" in config.report_formats:
+        pdf_file = out_dir / f"vibesafe-report-{date_str}.pdf"
+        try:
+            from xhtml2pdf import pisa
+            # Create a light-themed style variant for the PDF layout
+            pdf_html = html_content.replace(
+                "var(--bg-color);", "#ffffff;"
+            ).replace(
+                "var(--text-color);", "#333333;"
+            ).replace(
+                "var(--card-bg);", "#fcfcfc;"
+            ).replace(
+                "var(--border-color);", "#dddddd;"
+            ).replace(
+                "color: #ffffff;", "color: #111111;"
+            )
+            
+            with open(pdf_file, "wb") as f_pdf:
+                pisa_status = pisa.CreatePDF(pdf_html, dest=f_pdf)
+                
+            if not pisa_status.err:
+                saved_paths.append(str(pdf_file.resolve()))
+        except ImportError:
+            pass
 
     # Print success output
     print_report_saved(saved_paths)

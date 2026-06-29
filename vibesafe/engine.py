@@ -31,6 +31,8 @@ from vibesafe.ui import (
     print_error,
     print_warning,
 )
+from vibesafe.integrations import run_all_integrations
+from vibesafe.ai_triage import run_ai_triage
 
 
 # Phase module name mapping
@@ -166,14 +168,35 @@ def run_scan(config: VibesafeConfig) -> ScanResult:
     print_banner()
     print_scan_target(config.project_path, config.url)
 
-    # Run all 20 phases in order
-    for phase_number in range(1, 21):
+    # Run phases 1 to 19 in order
+    for phase_number in range(1, 20):
         result = run_phase(phase_number, config, scan_result)
         scan_result.phase_results.append(result)
 
         # After Phase 1, store tech stack for later phases
         if phase_number == 1 and hasattr(result, '_tech_stack'):
             scan_result.tech_stack = result._tech_stack
+
+    # Run external tool integrations (Phase 0)
+    integration_findings = run_all_integrations(config, scan_result)
+    integration_result = PhaseResult(
+        phase_number=0,
+        phase_name="External Tool Integration",
+        phase_type=PhaseType.AUTOMATED,
+        findings=integration_findings,
+        summary=f"Ran external security scanners (found {len(integration_findings)} findings)."
+    )
+    scan_result.phase_results.append(integration_result)
+
+    # Run AI triage to score, deduplicate, and prioritize findings
+    console.print("  [blue]🤖 Running local AI Triage engine...[/blue]")
+    triaged_findings = run_ai_triage(scan_result)
+    scan_result._triaged_findings = triaged_findings
+    console.print(f"  [green]✅ AI Triage complete (triaged into {len(triaged_findings)} prioritized findings)[/green]")
+
+    # Run Phase 20 (report generation)
+    report_result = run_phase(20, config, scan_result)
+    scan_result.phase_results.append(report_result)
 
     # Record end time
     scan_result.end_time = datetime.now()

@@ -34,49 +34,47 @@ VibeSafe bridges this gap by acting as an automated security engineer on your ma
 - **⚡ 20 Security Phases**: Structured after professional penetration testing playbooks.
 - **🔍 Auto-Tech Stack Detection**: Identifies Node.js, Python, Next.js, Express, Django, Flask, SQLite, Postgres, Supabase, Stripe, Razorpay, Cloudinary, and more.
 - **🔑 Custom SAST Engine**: Automated regular expression scanning targeting secrets, SQL injection, XSS, insecure file handling, and weak cryptographical setups.
-- **🤖 100% Automated Security Audits**: All authentication, authorization, uploads, database settings, and cloud configs are scanned automatically from the source code.
-- **📊 Professional Report Outputs**: Generates standard Markdown reports and responsive, dark-themed HTML dashboard reports with severity filters.
+- **🛡️ 5 Industry-Standard Integrations**: Deep scanning using CodeQL, Semgrep, Gitleaks, Trivy, and Nuclei (with zero-crash graceful degradation if not installed).
+- **🤖 Local AI Triage Engine**: Auto-deduplicates cross-tool findings, contextualizes exploitability ratings, groups repeated instances, and prioritizes fixes by risk-to-effort ratio.
+- **🚀 CI/CD Integration**: Supports automated GitHub Actions workflows (`vibesafe ci-init`), pipeline exit codes, and non-interactive `--ci` modes.
+- **🏷️ CWE & OWASP Mapping**: Complete CWE database enrichment and automated OWASP Top 10 coverage breakdowns.
+- **📊 Multi-Format Security Reports**: Generates standard Markdown reports, GitHub-styled dark HTML dashboards, and print-ready PDF reports.
 
 ---
 
 ## Architecture Diagram
 
 ```
-                              [ VibeSafe CLI ]
-                                      │
-                                      ▼
-                        [ Configuration Loader ] ( .vibesafe.yml )
-                                      │
-                                      ▼
-                           [ Phase Runner Engine ]
-                                      │
-         ┌────────────────────────────┴────────────────────────────┐
-         ▼                                                         ▼
-  [ Automated Code Scanners ]                            [ Live HTTP Scanner ]
-  ├── Phase 1: Recon                                     ├── Phase 6: Config Review
-  ├── Phase 2: Threat Modeling                           ├── Phase 16: Vuln Scan
-  ├── Phase 3: Architecture Mapping                      └── Phase 17: Latency Check
-  ├── Phase 4: SAST Scan
-  ├── Phase 5: Dependency Security
-  ├── Phase 7: Auth Controls (Auto)
-  ├── Phase 8: Authz Controls (Auto)
-  ├── Phase 9: Input Validation
-  ├── Phase 10: File Upload Review (Auto)
-  ├── Phase 11: API Security
-  ├── Phase 12: Database Security (Auto)
-  ├── Phase 13: Business Logic Testing (Auto)
-  ├── Phase 14: OWASP scorecard
-  ├── Phase 15: Penetration Testing (Auto)
-  ├── Phase 17: Performance & Resilience (Auto)
-  ├── Phase 18: Cloud Security (Auto)
-  └── Phase 19: Logging & Monitoring (Auto)
-                                      │
-                                      ▼
-                        [ Phase 20: Report Generator ]
-                                      │
-                     ┌────────────────┴────────────────┐
-                     ▼                                 ▼
-         [ Markdown Report File ]           [ Styled HTML Dashboard ]
+                               [ VibeSafe CLI ]
+                                       |
+                                       v
+                         [ Configuration Loader ] ( .vibesafe.yml )
+                                       |
+                                       v
+                            [ Phase Runner Engine ]
+                                       |
+         +-----------------------------+-----------------------------+
+         v                             v                             v
+  [ Automated Code Scanners ]   [ Live HTTP Scanner ]    [ Security Integrations ]
+  |-- Phase 1: Recon            |-- Phase 6: Config      |-- CodeQL CLI
+  |-- Phase 2: Threat Model     |-- Phase 16: Vuln Scan  |-- Semgrep
+  |-- Phase 3: Architecture     |-- Phase 17: Latency    |-- Gitleaks
+  |-- Phase 4: SAST Scan                                 |-- Trivy
+  |-- Phase 5: Dependencies                              |-- Nuclei Templates
+  |-- Phase 7: Auth Controls                                         |
+  |-- Phase 8: Authz Controls                                        v
+  |-- Phase 9: Input Validation                          [ Local AI Triage Engine ]
+  |-- Phase 10: File Uploads                             |-- Exploitability Scoring
+  |-- Phase 11: API Security                             |-- Smart Deduplication
+  |-- Phase 12: DB Security                              |-- Repeated Grouping
+  |-- Phase 13: Business Logic                           |-- Risk Prioritization
+  |-- Phase 14: OWASP Mapping                                        |
+  |-- Phase 15: Pentest Checks                                       v
+  |-- Phase 17: Resilience                               [ Report Generator ]
+  |-- Phase 18: Cloud Security                                       |
+  |-- Phase 19: Logging & Monitoring           +---------------------+---------------------+
+                                               v                     v                     v
+                                    [ Markdown Report ]     [ HTML Dashboard ]     [ PDF Document ]
 ```
 
 ---

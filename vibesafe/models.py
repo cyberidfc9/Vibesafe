@@ -96,6 +96,28 @@ class Finding:
     remediation: str = ""
     owasp_category: Optional[OWASPCategory] = None
     cwe_id: Optional[str] = None
+    exploitability_score: float = 5.0  # 0.0 (theoretical) to 10.0 (trivially exploitable)
+    source_tool: Optional[str] = None  # e.g., "vibesafe", "semgrep", "codeql", "gitleaks"
+    group_id: Optional[str] = None  # For AI triage deduplication grouping
+
+    @property
+    def risk_score(self) -> float:
+        """Combined risk score (0-100) factoring severity weight + exploitability."""
+        return self.severity.weight * (self.exploitability_score / 10.0)
+
+    @property
+    def risk_rating(self) -> str:
+        """Human-readable risk rating based on combined risk score."""
+        rs = self.risk_score
+        if rs >= 30:
+            return "CRITICAL"
+        if rs >= 15:
+            return "HIGH"
+        if rs >= 8:
+            return "MEDIUM"
+        if rs >= 3:
+            return "LOW"
+        return "INFO"
 
     def to_dict(self) -> dict:
         return {
@@ -110,6 +132,10 @@ class Finding:
             "remediation": self.remediation,
             "owasp_category": self.owasp_category.value if self.owasp_category else None,
             "cwe_id": self.cwe_id,
+            "exploitability_score": self.exploitability_score,
+            "risk_score": self.risk_score,
+            "risk_rating": self.risk_rating,
+            "source_tool": self.source_tool,
         }
 
 
@@ -214,8 +240,12 @@ class ScanResult:
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
 
+    _triaged_findings: Optional[list[Finding]] = None
+
     @property
     def all_findings(self) -> list[Finding]:
+        if self._triaged_findings is not None:
+            return self._triaged_findings
         findings = []
         for pr in self.phase_results:
             findings.extend(pr.findings)
@@ -230,9 +260,9 @@ class ScanResult:
 
     @property
     def score(self) -> int:
-        """Security score from 0–100. Starts at 100, deductions per finding."""
-        total_deduction = sum(f.severity.weight for f in self.all_findings)
-        return max(0, 100 - total_deduction)
+        """Security score from 0–100. Uses exploitability-weighted risk scoring."""
+        total_deduction = sum(f.risk_score for f in self.all_findings)
+        return max(0, min(100, 100 - int(total_deduction)))
 
     @property
     def grade(self) -> str:

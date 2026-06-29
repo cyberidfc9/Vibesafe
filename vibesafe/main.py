@@ -23,6 +23,7 @@ from vibesafe import __version__
 from vibesafe.config import VibesafeConfig, load_config, generate_default_config
 from vibesafe.engine import run_scan, run_single_phase
 from vibesafe.ui import print_banner, print_error, print_success, print_info
+from vibesafe.ci import scaffold_github_actions, print_ci_init_success, print_ci_summary, get_ci_exit_code
 
 app = typer.Typer(
     name="vibesafe",
@@ -69,7 +70,17 @@ def scan(
     report_format: Optional[str] = typer.Option(
         None,
         "--format", "-f",
-        help="Report format: markdown, html, or both (default: both)",
+        help="Report format: markdown, html, pdf, or both (default: both)",
+    ),
+    ci: bool = typer.Option(
+        False,
+        "--ci",
+        help="Enable CI/CD pipeline mode (non-interactive, outputs summary, strict exit codes)",
+    ),
+    ci_threshold: str = typer.Option(
+        "high",
+        "--ci-threshold",
+        help="Severity threshold to fail CI build (critical, high, medium, low)",
     ),
 ):
     """
@@ -103,9 +114,14 @@ def scan(
         config.output_dir = output
     if report_format:
         if report_format == "both":
-            config.report_formats = ["markdown", "html"]
+            config.report_formats = ["markdown", "html", "pdf"]
         else:
             config.report_formats = [report_format]
+    if ci:
+        config.ci_mode = True
+        config.skip_guided = True
+    if ci_threshold:
+        config.ci_threshold = ci_threshold
 
     # Run scan
     try:
@@ -117,7 +133,11 @@ def scan(
         console.print("\n\n  [yellow]⚠️  Scan interrupted by user[/yellow]\n")
         raise typer.Exit(0)
 
-    # Exit with non-zero if critical findings
+    # Exit with non-zero if findings exceed CI threshold (in CI mode) or if there are critical findings (standard mode)
+    if config.ci_mode:
+        exit_code = print_ci_summary(scan_result, config.ci_threshold)
+        raise typer.Exit(code=exit_code)
+
     critical_count = scan_result.severity_counts.get(
         __import__("vibesafe.models", fromlist=["Severity"]).Severity.CRITICAL, 0
     )
@@ -139,6 +159,25 @@ def init():
     config_path.write_text(generate_default_config(), encoding="utf-8")
     print_success(f"Created .vibesafe.yml in {Path('.').resolve()}")
     print_info("Edit this file to customize your scan settings.")
+
+
+@app.command(name="ci-init")
+def ci_init(
+    path: str = typer.Argument(
+        ".",
+        help="Path to the project directory to scaffold CI workflow for",
+    )
+):
+    """
+    🚀 Scaffold a GitHub Actions workflow for CI/CD pipeline integration.
+    """
+    project_path = str(Path(path).resolve())
+    if not os.path.isdir(project_path):
+        print_error(f"Directory not found: {project_path}")
+        raise typer.Exit(1)
+        
+    workflow_path = scaffold_github_actions(project_path)
+    print_ci_init_success(workflow_path)
 
 
 @app.command()

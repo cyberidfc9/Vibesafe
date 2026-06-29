@@ -68,6 +68,19 @@ class VibesafeConfig:
     # Tech stack overrides
     tech_stack_overrides: dict = field(default_factory=dict)
 
+    # CI/CD mode
+    ci_mode: bool = False  # Non-interactive mode with strict exit codes
+    ci_threshold: str = "high"  # Fail CI if findings >= this severity: critical, high, medium
+
+    # External tool integrations
+    enable_integrations: dict = field(default_factory=lambda: {
+        "codeql": True,
+        "semgrep": True,
+        "gitleaks": True,
+        "trivy": True,
+        "nuclei": True,
+    })
+
 
 def load_config(project_path: str, url: Optional[str] = None) -> VibesafeConfig:
     """Load configuration from .vibesafe.yml if it exists, otherwise use defaults."""
@@ -107,6 +120,12 @@ def load_config(project_path: str, url: Optional[str] = None) -> VibesafeConfig:
                 config.tech_stack_overrides = data["tech_stack"]
             if "url" in data and not url:
                 config.url = data["url"]
+            if "ci_mode" in data:
+                config.ci_mode = data["ci_mode"]
+            if "ci_threshold" in data:
+                config.ci_threshold = data["ci_threshold"]
+            if "enable_integrations" in data:
+                config.enable_integrations.update(data["enable_integrations"])
         except Exception:
             pass  # Silently fall back to defaults if config is malformed
 
@@ -165,4 +184,22 @@ def generate_default_config() -> str:
 #   framework: Next.js
 #   database: PostgreSQL
 #   hosting: Vercel
+
+# CI/CD mode settings
+# ci_mode: false
+# ci_threshold: high  # Fail CI if findings >= this severity: critical, high, medium
+
+# External tool integrations (set false to disable)
+# enable_integrations:
+#   codeql: true
+#   semgrep: true
+#   gitleaks: true
+#   trivy: true
+#   nuclei: true
+
+# Report formats: markdown, html, pdf, or combinations
+# report_formats:
+#   - markdown
+#   - html
+#   - pdf
 """
