@@ -31,10 +31,10 @@ VibeSafe bridges this gap by acting as an automated security engineer on your ma
 
 ## Key Features
 
-- **⚡ 20 Security Phases**: Structured after professional penetration testing firm playbooks.
+- **⚡ 20 Security Phases**: Structured after professional penetration testing playbooks.
 - **🔍 Auto-Tech Stack Detection**: Identifies Node.js, Python, Next.js, Express, Django, Flask, SQLite, Postgres, Supabase, Stripe, Razorpay, Cloudinary, and more.
 - **🔑 Custom SAST Engine**: Automated regular expression scanning targeting secrets, SQL injection, XSS, insecure file handling, and weak cryptographical setups.
-- **👤 Interactive Guided Checklists**: Simplifies authorization checks, business logic loops, and manual pen testing using beautiful console inputs.
+- **🤖 100% Automated Security Audits**: All authentication, authorization, uploads, database settings, and cloud configs are scanned automatically from the source code.
 - **📊 Professional Report Outputs**: Generates standard Markdown reports and responsive, dark-themed HTML dashboard reports with severity filters.
 
 ---
@@ -50,16 +50,26 @@ VibeSafe bridges this gap by acting as an automated security engineer on your ma
                                       ▼
                            [ Phase Runner Engine ]
                                       │
-        ┌─────────────────────────────┼─────────────────────────────┐
-        ▼                             ▼                             ▼
- [ Automated Scans ]          [ Hybrid Scans ]             [ Guided Checklists ]
- ├── Phase 1: Recon           ├── Phase 5: Dependencies    ├── Phase 7: Auth Testing
- ├── Phase 2: Threat Model    ├── Phase 6: Config Review   ├── Phase 8: Authz Testing
- ├── Phase 3: Architecture    ├── Phase 10: Upload Review  ├── Phase 13: Business Logic
- ├── Phase 4: SAST Scan       ├── Phase 12: DB Security    ├── Phase 15: Manual Pen Test
- ├── Phase 9: Input Valid     ├── Phase 16: Vuln Scan      ├── Phase 17: Performance
- ├── Phase 11: API Security   └── Phase 18: Cloud Security └── Phase 19: Logging & Mon
- └── Phase 14: OWASP scorecard
+         ┌────────────────────────────┴────────────────────────────┐
+         ▼                                                         ▼
+  [ Automated Code Scanners ]                            [ Live HTTP Scanner ]
+  ├── Phase 1: Recon                                     ├── Phase 6: Config Review
+  ├── Phase 2: Threat Modeling                           ├── Phase 16: Vuln Scan
+  ├── Phase 3: Architecture Mapping                      └── Phase 17: Latency Check
+  ├── Phase 4: SAST Scan
+  ├── Phase 5: Dependency Security
+  ├── Phase 7: Auth Controls (Auto)
+  ├── Phase 8: Authz Controls (Auto)
+  ├── Phase 9: Input Validation
+  ├── Phase 10: File Upload Review (Auto)
+  ├── Phase 11: API Security
+  ├── Phase 12: Database Security (Auto)
+  ├── Phase 13: Business Logic Testing (Auto)
+  ├── Phase 14: OWASP scorecard
+  ├── Phase 15: Penetration Testing (Auto)
+  ├── Phase 17: Performance & Resilience (Auto)
+  ├── Phase 18: Cloud Security (Auto)
+  └── Phase 19: Logging & Monitoring (Auto)
                                       │
                                       ▼
                         [ Phase 20: Report Generator ]
@@ -170,56 +180,56 @@ VibeSafe uses a structured CLI command system. Here is a summary of all commands
 - **Actions:** Checks source code configs. If `--url` is specified, it makes live requests to inspect HTTP security headers (CSP, HSTS, CORS) and cookie attributes (Secure, HttpOnly, SameSite).
 
 ### 7. Authentication Testing
-- **Type:** Guided Checklist
-- **Actions:** Reviews password rules, login rate limiting, session timeout handling, and Multi-Factor Authentication (MFA) setups.
+- **Type:** Automated
+- **Actions:** Scans source code for secure password hashing (bcrypt, argon2), auth route rate limiting, MFA libraries, session timeout configurations, and password strength policies.
 
 ### 8. Authorization Testing
-- **Type:** Guided Checklist
-- **Actions:** Verifies server-side privilege checks, checks for IDOR (Insecure Direct Object Reference) vulnerabilities, and confirms normal users can't call admin APIs.
+- **Type:** Automated
+- **Actions:** Verifies presence of route authentication guards/middleware, role-based checks (RBAC), token scopes, and checks for potential IDOR (Insecure Direct Object Reference) vulnerabilities in queries.
 
 ### 9. Input Validation
 - **Type:** Automated
 - **Actions:** Scans request handlers for unvalidated schema parameters, missing body validation libraries (like Zod or Joi), and Regular Expression Denial of Service (ReDoS) issues.
 
 ### 10. File Upload Review
-- **Type:** Hybrid
-- **Actions:** Analyzes upload modules (multer, formidable) and guides you through testing allowed extensions, filename sanitization, and execution restrictions.
+- **Type:** Automated
+- **Actions:** Identifies upload endpoints and checks for allowlisted file type validation, maximum file size restrictions, filename sanitization, and external cloud storage (like S3/Cloudinary).
 
 ### 11. API Security
 - **Type:** Automated
 - **Actions:** Scans API route directories for unauthenticated paths, input sanitization checks, and traceback exposures.
 
 ### 12. Database Security
-- **Type:** Hybrid
-- **Actions:** Inspects schema configurations, tests password hashing algorithms, and guides reviews of user access levels and database backups.
+- **Type:** Automated
+- **Actions:** Inspects schema configurations, checks for hardcoded connection credentials, verifies password hashing on DB write operations, and scans for raw SQL injection risks.
 
 ### 13. Business Logic Testing
-- **Type:** Guided Checklist
-- **Actions:** Dynamically generates test matrices based on your features (e.g. testing negative pricing or coupon code reuse in e-commerce).
+- **Type:** Automated
+- **Actions:** Scans e-commerce and transaction handlers for negative pricing/quantity validation, database locking/transactions, idempotency keys, and workflow state validation checks.
 
 ### 14. OWASP Top 10 Review
 - **Type:** Automated
 - **Actions:** Maps all findings discovered across the run to their respective categories on the OWASP Top 10 scorecard.
 
-### 15. Manual Penetration Testing
-- **Type:** Guided Checklist
-- **Actions:** Guides manual exploration for session fixation, error-based info leakage, and privilege elevation.
+### 15. Penetration Testing
+- **Type:** Automated
+- **Actions:** Scans for exposed production source maps (JS maps), verbose exception leaks in API responses, and hardcoded development/debug modes.
 
 ### 16. Automated Vulnerability Scan
 - **Type:** Hybrid
 - **Actions:** If a live URL is provided, scans for public files (`/.env`, `/.git/config`, `wp-config.php.bak`) and directory listing vulnerabilities.
 
-### 17. Performance & DoS Testing
-- **Type:** Hybrid
-- **Actions:** Checks rate limiting parameters, Gzip/Brotli payload compression, and large body payload filters.
+### 17. Performance & Resilience
+- **Type:** Automated
+- **Actions:** Checks rate limiting libraries, Gzip/Brotli payload compression, timeout settings for external calls, and measures live host response latency.
 
-### 18. Cloud Security Review
-- **Type:** Hybrid
-- **Actions:** Evaluates storage bucket access controls, platform credential usage, and IAM roles.
+### 18. Cloud Security
+- **Type:** Automated
+- **Actions:** Scans for permissive Firebase security rules, root Docker container configurations, public S3 bucket ACL configurations, and committed cloud credentials.
 
 ### 19. Logging & Monitoring
-- **Type:** Hybrid
-- **Actions:** Verifies that logs do not print passwords or keys in plaintext, and confirms integration with tracking services (like Sentry).
+- **Type:** Automated
+- **Actions:** Scans for sensitive data leaking into logs (passwords, keys), winston/pino structured logging configurations, and error monitoring services (Sentry/Bugsnag).
 
 ### 20. Final Security Audit
 - **Type:** Automated
